@@ -1,1 +1,86 @@
-1
+<!DOCTYPE html>
+<html>
+  <head>
+    <script src="//js.jotform.com/JotFormCustomWidget.min.js"></script>
+    <style>
+      body {
+        font-family: sans-serif;
+        padding: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="widgetContainer">
+      <p id="loadingMessage">Loading options...</p>
+    </div>
+
+    <script>
+      JFCustomWidget.subscribe("ready", function(formId, widgetValue) {
+        var dataUrl = JFCustomWidget.getWidgetSetting("SheetURL");
+        var container = document.getElementById("widgetContainer");
+        var loadingMsg = document.getElementById("loadingMessage");
+
+        fetch(dataUrl)
+          .then(response => response.json())
+          .then(data => {
+            if (loadingMsg) container.removeChild(loadingMsg);
+
+            let optionsList = data.values || [];
+            if (optionsList.length && optionsList[0][0] === "Options") {
+              optionsList.shift();
+            }
+
+            var selectEl = document.createElement("select");
+            selectEl.id = "sheetDropdown";
+
+            var placeholderOpt = document.createElement("option");
+            placeholderOpt.textContent = "Please select...";
+            placeholderOpt.disabled = true;
+            placeholderOpt.selected = true;
+            selectEl.appendChild(placeholderOpt);
+
+            optionsList.forEach(row => {
+              var optionValue = row[0];
+              var opt = document.createElement("option");
+              opt.value = optionValue;
+              opt.textContent = optionValue;
+              selectEl.appendChild(opt);
+            });
+
+            container.appendChild(selectEl);
+
+            if (widgetValue) {
+              selectEl.value = widgetValue;
+            }
+
+            JFCustomWidget.requestFrameResize({ height: document.body.scrollHeight });
+          })
+          .catch(err => {
+            if (loadingMsg) loadingMsg.textContent = "Error loading data.";
+            console.error("Widget data fetch error:", err);
+          });
+      });
+
+      JFCustomWidget.subscribe("submit", function() {
+        var result = { valid: true };
+        var selectEl = document.getElementById("sheetDropdown");
+
+        if (selectEl) {
+          result.value = selectEl.value || "";
+        } else {
+          var checkedVals = [];
+          document.querySelectorAll("input[type=checkbox]:checked").forEach(cb => {
+            checkedVals.push(cb.value);
+          });
+          result.value = checkedVals.join(", ");
+        }
+
+        if (!result.value) {
+          result.valid = false;
+        }
+
+        JFCustomWidget.sendSubmit(result);
+      });
+    </script>
+  </body>
+</html>
