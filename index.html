@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Dynamic Google Sheet Dropdown</title>
+    <title>Dynamic Google Sheet Answers</title>
     <style>
       body {
         font-family: sans-serif;
@@ -20,44 +20,67 @@
     </div>
 
     <script>
+      // === Widget Settings ===
+      const answerFormat = "checkbox"; // Change to 'dropdown', 'radio', or 'checkbox'
       const dataUrl = "https://sheets.googleapis.com/v4/spreadsheets/15LC4rMEJlXGIyWTn41rmIAB32t4LXDOM5UNskP8t4Wc/values/A:B?key=AIzaSyDW-WRhESRFREtoq76Ys953GFb_4jvdz08";
 
       function setAnswer(value) {
         window.parent.postMessage({ action: "setAnswer", value: value }, "*");
       }
 
-      function renderDropdown(options) {
-        const select = document.createElement("select");
-        select.innerHTML = '<option disabled selected>Please select...</option>';
-        options.forEach(option => {
-          const opt = document.createElement("option");
-          opt.value = option;
-          opt.textContent = option;
-          select.appendChild(opt);
-        });
+      function renderOptions(options, format) {
+        const container = document.getElementById("widgetContainer");
+        container.innerHTML = "";
 
-        select.addEventListener("change", () => {
-          setAnswer(select.value);
-        });
+        if (format === "dropdown") {
+          const select = document.createElement("select");
+          select.innerHTML = '<option disabled selected>Please select...</option>';
+          options.forEach(option => {
+            const opt = document.createElement("option");
+            opt.value = option;
+            opt.textContent = option;
+            select.appendChild(opt);
+          });
+          select.addEventListener("change", () => {
+            setAnswer(select.value);
+          });
+          container.appendChild(select);
 
-        document.getElementById("widgetContainer").appendChild(select);
+        } else if (format === "radio") {
+          options.forEach(option => {
+            const label = document.createElement("label");
+            label.innerHTML = `<input type="radio" name="answerGroup" value="${option}"> ${option}`;
+            label.querySelector("input").addEventListener("change", () => {
+              setAnswer(option);
+            });
+            container.appendChild(label);
+            container.appendChild(document.createElement("br"));
+          });
+
+        } else if (format === "checkbox") {
+          options.forEach(option => {
+            const label = document.createElement("label");
+            label.innerHTML = `<input type="checkbox" value="${option}"> ${option}`;
+            label.querySelector("input").addEventListener("change", () => {
+              const checked = Array.from(container.querySelectorAll("input[type=checkbox]:checked")).map(cb => cb.value);
+              setAnswer(checked.join(", "));
+            });
+            container.appendChild(label);
+            container.appendChild(document.createElement("br"));
+          });
+        }
       }
+
+      let currentOptions = [];
 
       fetch(dataUrl)
         .then(res => res.json())
         .then(data => {
-          const container = document.getElementById("widgetContainer");
-          container.innerHTML = ""; // Clear loading
-
           const values = data.values || [];
-          const rows = values.slice(1); // skip header
-          const optionsList = rows.map(row => row[0]); // use first column only
-
-          if (optionsList.length > 0) {
-            renderDropdown(optionsList);
-          } else {
-            container.innerHTML = "No data found.";
-          }
+          const rows = values.slice(1);
+          currentOptions = rows.map(row => row[0]);
+          document.getElementById("loadingMessage").remove();
+          renderOptions(currentOptions, answerFormat);
         })
         .catch(err => {
           console.error("Fetch error:", err);
