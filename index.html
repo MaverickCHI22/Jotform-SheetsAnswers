@@ -1,11 +1,16 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <script src="//js.jotform.com/JotFormCustomWidget.min.js"></script>
+    <meta charset="utf-8" />
+    <title>Dynamic Google Sheet Dropdown</title>
     <style>
       body {
         font-family: sans-serif;
         padding: 10px;
+      }
+      select, input[type="radio"], input[type="checkbox"] {
+        margin: 5px 0;
+        font-size: 16px;
       }
     </style>
   </head>
@@ -15,72 +20,49 @@
     </div>
 
     <script>
-      JFCustomWidget.subscribe("ready", function(formId, widgetValue) {
-        var dataUrl = JFCustomWidget.getWidgetSetting("SheetURL");
-        var container = document.getElementById("widgetContainer");
-        var loadingMsg = document.getElementById("loadingMessage");
+      const dataUrl = "https://sheets.googleapis.com/v4/spreadsheets/15LC4rMEJlXGIyWTn41rmIAB32t4LXDOM5UNskP8t4Wc/values/A:B?key=AIzaSyDW-WRhESRFREtoq76Ys953GFb_4jvdz08";
 
-        fetch(dataUrl)
-          .then(response => response.json())
-          .then(data => {
-            if (loadingMsg) container.removeChild(loadingMsg);
+      function setAnswer(value) {
+        window.parent.postMessage({ action: "setAnswer", value: value }, "*");
+      }
 
-            let optionsList = data.values || [];
-            if (optionsList.length && optionsList[0][0] === "Options") {
-              optionsList.shift();
-            }
+      function renderDropdown(options) {
+        const select = document.createElement("select");
+        select.innerHTML = '<option disabled selected>Please select...</option>';
+        options.forEach(option => {
+          const opt = document.createElement("option");
+          opt.value = option;
+          opt.textContent = option;
+          select.appendChild(opt);
+        });
 
-            var selectEl = document.createElement("select");
-            selectEl.id = "sheetDropdown";
+        select.addEventListener("change", () => {
+          setAnswer(select.value);
+        });
 
-            var placeholderOpt = document.createElement("option");
-            placeholderOpt.textContent = "Please select...";
-            placeholderOpt.disabled = true;
-            placeholderOpt.selected = true;
-            selectEl.appendChild(placeholderOpt);
+        document.getElementById("widgetContainer").appendChild(select);
+      }
 
-            optionsList.forEach(row => {
-              var optionValue = row[0];
-              var opt = document.createElement("option");
-              opt.value = optionValue;
-              opt.textContent = optionValue;
-              selectEl.appendChild(opt);
-            });
+      fetch(dataUrl)
+        .then(res => res.json())
+        .then(data => {
+          const container = document.getElementById("widgetContainer");
+          container.innerHTML = ""; // Clear loading
 
-            container.appendChild(selectEl);
+          const values = data.values || [];
+          const rows = values.slice(1); // skip header
+          const optionsList = rows.map(row => row[0]); // use first column only
 
-            if (widgetValue) {
-              selectEl.value = widgetValue;
-            }
-
-            JFCustomWidget.requestFrameResize({ height: document.body.scrollHeight });
-          })
-          .catch(err => {
-            if (loadingMsg) loadingMsg.textContent = "Error loading data.";
-            console.error("Widget data fetch error:", err);
-          });
-      });
-
-      JFCustomWidget.subscribe("submit", function() {
-        var result = { valid: true };
-        var selectEl = document.getElementById("sheetDropdown");
-
-        if (selectEl) {
-          result.value = selectEl.value || "";
-        } else {
-          var checkedVals = [];
-          document.querySelectorAll("input[type=checkbox]:checked").forEach(cb => {
-            checkedVals.push(cb.value);
-          });
-          result.value = checkedVals.join(", ");
-        }
-
-        if (!result.value) {
-          result.valid = false;
-        }
-
-        JFCustomWidget.sendSubmit(result);
-      });
+          if (optionsList.length > 0) {
+            renderDropdown(optionsList);
+          } else {
+            container.innerHTML = "No data found.";
+          }
+        })
+        .catch(err => {
+          console.error("Fetch error:", err);
+          document.getElementById("loadingMessage").textContent = "Error loading data.";
+        });
     </script>
   </body>
 </html>
